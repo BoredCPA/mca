@@ -1,11 +1,24 @@
-from sqlmodel import SQLModel, Field
-from typing import Optional
-from datetime import date
+from sqlalchemy import Column, Integer, String, Text, Date, DateTime, func
+from app.database import Base
 
-class Merchant(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    company_name: str
-    address: str
-    fein: str
-    entity_type: str
-    submitted_date: Optional[date] = None
+class Merchant(Base):
+    __tablename__ = "merchants"
+
+    id = Column(Integer, primary_key=True, index=True)
+    company_name = Column(String, nullable=False)
+    address = Column(Text)
+    city = Column(String)
+    state = Column(String)
+    zip = Column(String)
+    fein = Column(String, unique=True)
+    phone = Column(String)
+    entity_type = Column(String)
+    submitted_date = Column(Date)
+
+    email = Column(String)
+    contact_person = Column(String)
+    status = Column(String, default="lead")
+    notes = Column(Text)
+
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())

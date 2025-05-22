@@ -1,9 +1,6 @@
 from fastapi import FastAPI
-from database import init_db
-from routers import merchant
+from app.routes import merchant
 
 app = FastAPI()
-
-init_db()
 
 app.include_router(merchant.router)

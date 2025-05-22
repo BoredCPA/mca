@@ -1,8 +1,11 @@
-from sqlmodel import SQLModel, create_engine
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
 
-DATABASE_URL = "sqlite:///mca_crm.db"  # switch to Postgres if needed
-engine = create_engine(DATABASE_URL, echo=True)
+SQLALCHEMY_DATABASE_URL = "sqlite:///./mca_crm.db"
 
-def init_db():
-    from models.merchant import Merchant  # import all models
-    SQLModel.metadata.create_all(engine)
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()

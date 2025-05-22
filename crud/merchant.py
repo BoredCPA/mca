@@ -1,38 +1,24 @@
-from sqlmodel import Session, select
-from models.merchant import Merchant
-from database import engine
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from app.schemas.merchant import Merchant, MerchantCreate
+from app.crud import merchant as merchant_crud
+from app.database import SessionLocal, engine, Base
 
-def create_merchant(merchant: Merchant) -> Merchant:
-    with Session(engine) as session:
-        session.add(merchant)
-        session.commit()
-        session.refresh(merchant)
-        return merchant
+Base.metadata.create_all(bind=engine)
 
-def get_merchant(id: int) -> Merchant | None:
-    with Session(engine) as session:
-        return session.get(Merchant, id)
+router = APIRouter()
 
-def get_all_merchants() -> list[Merchant]:
-    with Session(engine) as session:
-        return session.exec(select(Merchant)).all()
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
-def update_merchant(id: int, updated_data: dict) -> Merchant | None:
-    with Session(engine) as session:
-        merchant = session.get(Merchant, id)
-        if not merchant:
-            return None
-        for key, value in updated_data.items():
-            setattr(merchant, key, value)
-        session.commit()
-        session.refresh(merchant)
-        return merchant
+@router.post("/merchants/", response_model=Merchant)
+def create_merchant(merchant: MerchantCreate, db: Session = Depends(get_db)):
+    return merchant_crud.create_merchant(db, merchant)
 
-def delete_merchant(id: int) -> bool:
-    with Session(engine) as session:
-        merchant = session.get(Merchant, id)
-        if not merchant:
-            return False
-        session.delete(merchant)
-        session.commit()
-        return True
+@router.get("/merchants/", response_model=list[Merchant])
+def read_merchants(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return merchant_crud.get_merchants(db, skip=skip, limit=limit)

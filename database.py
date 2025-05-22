@@ -9,3 +9,8 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
+
+
+def init_db():
+    from app.models import merchant  # make sure this imports the models
+    Base.metadata.create_all(bind=engine)

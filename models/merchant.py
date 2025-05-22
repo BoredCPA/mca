@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, Date, DateTime, func
 from app.database import Base
 
+
 class Merchant(Base):
     __tablename__ = "merchants"
 

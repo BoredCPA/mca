@@ -1,24 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.schemas.merchant import Merchant, MerchantCreate
-from app.crud import merchant as merchant_crud
-from app.database import SessionLocal, engine, Base
+from app.models.merchant import Merchant as MerchantModel
+from app.schemas.merchant import MerchantCreate
 
-Base.metadata.create_all(bind=engine)
+def create_merchant(db: Session, merchant: MerchantCreate):
+    db_merchant = MerchantModel(**merchant.dict())
+    db.add(db_merchant)
+    db.commit()
+    db.refresh(db_merchant)
+    return db_merchant
 
-router = APIRouter()
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-@router.post("/merchants/", response_model=Merchant)
-def create_merchant(merchant: MerchantCreate, db: Session = Depends(get_db)):
-    return merchant_crud.create_merchant(db, merchant)
-
-@router.get("/merchants/", response_model=list[Merchant])
-def read_merchants(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return merchant_crud.get_merchants(db, skip=skip, limit=limit)
+def get_merchants(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(MerchantModel).offset(skip).limit(limit).all()

@@ -2,6 +2,7 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import date, datetime
 
+
 class MerchantBase(BaseModel):
     company_name: str
     address: Optional[str] = None
@@ -17,8 +18,10 @@ class MerchantBase(BaseModel):
     status: Optional[str] = "lead"
     notes: Optional[str] = None
 
+
 class MerchantCreate(MerchantBase):
     pass
+
 
 class Merchant(MerchantBase):
     id: int
@@ -26,4 +29,4 @@ class Merchant(MerchantBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True

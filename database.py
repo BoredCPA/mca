@@ -10,7 +10,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
-
+# In app/database.py, make sure you have:
 def init_db():
-    from app.models import merchant  # make sure this imports the models
+    from app.models import merchant, offer  # Both imports
     Base.metadata.create_all(bind=engine)

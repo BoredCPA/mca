@@ -38,7 +38,7 @@ def init_db():
     Initialize the database by creating all tables.
     """
     # Import all models here to ensure they are registered with Base
-    from app.models import merchant, offer
+    from app.models import merchant, offer, principal
 
     # Create all tables
     Base.metadata.create_all(bind=engine)

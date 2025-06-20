@@ -1,5 +1,5 @@
 # app/schemas/principal.py
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, field_validator, model_validator, validator
 from typing import Optional, List
 from datetime import date, datetime
 from decimal import Decimal
@@ -34,7 +34,7 @@ class PrincipalBase(BaseModel):
     )
     ssn: Optional[str] = Field(
         None,
-        regex="^\\d{3}-\\d{2}-\\d{4}$",
+        pattern="^\\d{3}-\\d{2}-\\d{4}$",
         description="Social Security Number (XXX-XX-XXXX)"
     )
     date_of_birth: Optional[date] = Field(
@@ -54,17 +54,17 @@ class PrincipalBase(BaseModel):
     )
     state: Optional[str] = Field(
         None,
-        regex="^[A-Z]{2}$",
+        pattern="^[A-Z]{2}$",
         description="Two-letter state code"
     )
     zip: Optional[str] = Field(
         None,
-        regex="^\\d{5}(-\\d{4})?$",
+        pattern="^\\d{5}(-\\d{4})?$",
         description="ZIP code"
     )
     phone: Optional[str] = Field(
         None,
-        regex="^\\+?1?\\d{10,14}$",
+        pattern="^\\+?1?\\d{10,14}$",
         description="Phone number"
     )
     email: Optional[str] = Field(
@@ -82,7 +82,7 @@ class PrincipalBase(BaseModel):
     )
 
     # Validators
-    @validator('first_name', 'last_name')
+    @field_validator('first_name', 'last_name')
     def validate_name(cls, v):
         if v:
             # Remove extra whitespace
@@ -92,7 +92,7 @@ class PrincipalBase(BaseModel):
                 raise ValueError('Name can only contain letters, spaces, hyphens, and apostrophes')
         return v
 
-    @validator('title')
+    @field_validator('title')
     def validate_title(cls, v):
         if v:
             # Normalize common titles
@@ -116,7 +116,7 @@ class PrincipalBase(BaseModel):
                 v = title_map[v_lower]
         return v
 
-    @validator('ssn')
+    @field_validator('ssn')
     def validate_ssn(cls, v):
         if v:
             # Remove any non-numeric characters
@@ -134,7 +134,7 @@ class PrincipalBase(BaseModel):
                 raise ValueError('Invalid SSN')
         return v
 
-    @validator('date_of_birth')
+    @field_validator('date_of_birth')
     def validate_date_of_birth(cls, v):
         if v:
             # Must be at least 18 years old
@@ -147,7 +147,7 @@ class PrincipalBase(BaseModel):
                 raise ValueError('Invalid date of birth')
         return v
 
-    @validator('state')
+    @field_validator('state')
     def validate_state(cls, v):
         if v:
             v = v.upper()
@@ -162,14 +162,14 @@ class PrincipalBase(BaseModel):
                 raise ValueError(f'Invalid state code')
         return v
 
-    @validator('zip')
+    @field_validator('zip')
     def validate_zip(cls, v):
         if v:
             # Remove any spaces
             v = v.replace(' ', '')
         return v
 
-    @validator('phone')
+    @field_validator('phone')
     def validate_phone(cls, v):
         if v:
             # Remove all non-numeric characters
@@ -182,7 +182,7 @@ class PrincipalBase(BaseModel):
                 v = f"+{cleaned}"
         return v
 
-    @validator('email')
+    @field_validator('email')
     def validate_email(cls, v):
         if v:
             # Basic email validation
@@ -191,7 +191,7 @@ class PrincipalBase(BaseModel):
             v = v.lower()
         return v
 
-    @root_validator
+    @model_validator(mode="after")
     def validate_address_completeness(cls, values):
         # If any address field is provided, require city and state
         address = values.get('home_address')
@@ -213,13 +213,13 @@ class PrincipalUpdate(BaseModel):
     last_name: Optional[str] = Field(None, min_length=1, max_length=100)
     title: Optional[str] = Field(None, max_length=100)
     ownership_percentage: Optional[Decimal] = Field(None, ge=0, le=100, decimal_places=2)
-    ssn: Optional[str] = Field(None, regex="^\\d{3}-\\d{2}-\\d{4}$")
+    ssn: Optional[str] = Field(None, pattern="^\\d{3}-\\d{2}-\\d{4}$")
     date_of_birth: Optional[date] = None
     home_address: Optional[str] = Field(None, max_length=500)
     city: Optional[str] = Field(None, min_length=2, max_length=100)
-    state: Optional[str] = Field(None, regex="^[A-Z]{2}$")
-    zip: Optional[str] = Field(None, regex="^\\d{5}(-\\d{4})?$")
-    phone: Optional[str] = Field(None, regex="^\\+?1?\\d{10,14}$")
+    state: Optional[str] = Field(None, pattern="^[A-Z]{2}$")
+    zip: Optional[str] = Field(None, pattern="^\\d{5}(-\\d{4})?$")
+    phone: Optional[str] = Field(None, pattern="^\\+?1?\\d{10,14}$")
     email: Optional[str] = Field(None, max_length=255)
     is_primary_contact: Optional[bool] = None
     is_guarantor: Optional[bool] = None

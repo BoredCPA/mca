@@ -1,5 +1,5 @@
 # app/schemas/merchant.py - Enhanced with comprehensive validation
-from pydantic import BaseModel, EmailStr, validator, Field
+from pydantic import BaseModel, EmailStr, validator, Field, field_validator
 from typing import Optional, List
 from datetime import date, datetime
 import re
@@ -70,7 +70,7 @@ class MerchantBase(BaseModel):
     )
 
     # Validators
-    @validator('company_name')
+    @field_validator('company_name')
     def validate_company_name(cls, v):
         if not v or not v.strip():
             raise ValueError('Company name cannot be empty')
@@ -84,7 +84,7 @@ class MerchantBase(BaseModel):
             raise ValueError('Company name must contain at least one letter')
         return v
 
-    @validator('state')
+    @field_validator('state')
     def validate_state(cls, v):
         if v is None:
             return v
@@ -99,10 +99,10 @@ class MerchantBase(BaseModel):
             'DC', 'PR', 'VI', 'GU', 'AS', 'MP'  # Include territories
         ]
         if v not in valid_states:
-            raise ValueError(f'Invalid state code. Must be one of: {", ".join(valid_states)}')
+            raise ValueError(f'Invalid state')
         return v
 
-    @validator('zip')
+    @field_validator('zip')
     def validate_zip(cls, v):
         if v is None:
             return v
@@ -116,7 +116,7 @@ class MerchantBase(BaseModel):
             v = f"{v[:5]}-{v[5:]}"
         return v
 
-    @validator('fein')
+    @field_validator('fein')
     def validate_fein(cls, v):
         if v is None:
             return v
@@ -128,7 +128,7 @@ class MerchantBase(BaseModel):
         # Format as XX-XXXXXXX
         return f"{cleaned[:2]}-{cleaned[2:]}"
 
-    @validator('phone')
+    @field_validator('phone')
     def validate_phone(cls, v):
         if v is None:
             return v
@@ -145,7 +145,7 @@ class MerchantBase(BaseModel):
         else:
             raise ValueError('Phone number must be 10 digits')
 
-    @validator('entity_type')
+    @field_validator('entity_type')
     def validate_entity_type(cls, v):
         if v is None:
             return v
@@ -158,7 +158,7 @@ class MerchantBase(BaseModel):
             raise ValueError(f'Invalid entity type. Must be one of: {", ".join(valid_types)}')
         return v
 
-    @validator('status')
+    @field_validator('status')
     def validate_status(cls, v):
         if v is None:
             return 'lead'
@@ -171,7 +171,7 @@ class MerchantBase(BaseModel):
             raise ValueError(f'Invalid status. Must be one of: {", ".join(valid_statuses)}')
         return v
 
-    @validator('submitted_date')
+    @field_validator('submitted_date')
     def validate_submitted_date(cls, v):
         if v is None:
             return v
@@ -183,7 +183,7 @@ class MerchantBase(BaseModel):
             raise ValueError('Submitted date seems too far in the past')
         return v
 
-    @validator('email')
+    @field_validator('email')
     def validate_email_format(cls, v):
         if v is None:
             return v
@@ -202,7 +202,7 @@ class MerchantBase(BaseModel):
             raise ValueError('Disposable email addresses are not allowed')
         return v
 
-    @validator('contact_person')
+    @field_validator('contact_person')
     def validate_contact_person(cls, v):
         if v is None:
             return v
@@ -220,7 +220,7 @@ class MerchantBase(BaseModel):
             raise ValueError('Please provide a valid contact person name')
         return v
 
-    @validator('city')
+    @field_validator('city')
     def validate_city(cls, v):
         if v is None:
             return v
@@ -237,7 +237,7 @@ class MerchantBase(BaseModel):
 
 class MerchantCreate(MerchantBase):
     # Additional validation for creation
-    @validator('company_name')
+    @field_validator('company_name')
     def company_name_required(cls, v):
         if not v:
             raise ValueError('Company name is required')

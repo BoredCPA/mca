@@ -1,4 +1,4 @@
-# app/models/merchant.py (UPDATED)
+# app/models/merchant.py
 from sqlalchemy import Column, Integer, String, Text, Date, DateTime, func
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -26,5 +26,6 @@ class Merchant(Base):
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
-    # Relationship to offers
+    # Relationships
     offers = relationship("Offer", back_populates="merchant")
+    principals = relationship("Principal", back_populates="merchant", cascade="all, delete-orphan")

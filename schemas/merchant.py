@@ -1,4 +1,4 @@
-# app/schemas/merchant.py - Enhanced with comprehensive validation
+# app/schemas/merchant.py - Optimized for backend validation only
 from pydantic import BaseModel, EmailStr, validator, Field, field_validator
 from typing import Optional, List
 from datetime import date, datetime
@@ -31,11 +31,11 @@ class MerchantBase(BaseModel):
     )
     zip: Optional[str] = Field(
         None,
-        description="ZIP code (5 or 9 digits)"
+        description="ZIP code"
     )
     fein: Optional[str] = Field(
         None,
-        description="Federal Employer Identification Number (XX-XXXXXXX)"
+        description="Federal Employer Identification Number"
     )
     phone: Optional[str] = Field(
         None,
@@ -69,26 +69,23 @@ class MerchantBase(BaseModel):
         description="Internal notes"
     )
 
-    # Validators
+    # Backend-only validators - focus on business rules and data integrity
     @field_validator('company_name')
     def validate_company_name(cls, v):
         if not v or not v.strip():
             raise ValueError('Company name cannot be empty')
-        # Remove extra whitespace
+        # Clean up whitespace
         v = ' '.join(v.split())
-        # Check for minimum meaningful length
+        # Basic length check (business rule)
         if len(v) < 2:
             raise ValueError('Company name must be at least 2 characters')
-        # Check for suspicious patterns (all numbers, special chars only)
-        if not re.search(r'[a-zA-Z]', v):
-            raise ValueError('Company name must contain at least one letter')
         return v
 
     @field_validator('state')
     def validate_state(cls, v):
         if v is None:
             return v
-        # Uppercase and validate state code
+        # Normalize and validate state code (business rule)
         v = v.upper().strip()
         valid_states = [
             'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
@@ -99,56 +96,51 @@ class MerchantBase(BaseModel):
             'DC', 'PR', 'VI', 'GU', 'AS', 'MP'  # Include territories
         ]
         if v not in valid_states:
-            raise ValueError(f'Invalid state')
+            raise ValueError('Invalid state code')
         return v
 
     @field_validator('zip')
     def validate_zip(cls, v):
         if v is None:
             return v
-        # Remove any spaces or dashes
-        v = re.sub(r'[\s-]', '', v.strip())
-        # Validate ZIP format (5 digits or 9 digits)
-        if not re.match(r'^\d{5}(\d{4})?$', v):
-            raise ValueError('ZIP code must be 5 or 9 digits (e.g., 12345 or 123456789)')
-        # Format with dash if 9 digits
-        if len(v) == 9:
-            v = f"{v[:5]}-{v[5:]}"
-        return v
+        # Basic sanitization - store clean digits only
+        cleaned = re.sub(r'[\s-]', '', v.strip())
+        # Basic validation - ensure it's numeric
+        if not cleaned.isdigit():
+            raise ValueError('ZIP code must contain only digits')
+        # Length validation (business rule)
+        if len(cleaned) not in [5, 9]:
+            raise ValueError('ZIP code must be 5 or 9 digits')
+        return cleaned
 
     @field_validator('fein')
     def validate_fein(cls, v):
         if v is None:
             return v
-        # Remove any spaces or dashes
+        # Clean and validate FEIN (business rule)
         cleaned = re.sub(r'[\s-]', '', v.strip())
-        # Validate FEIN format (9 digits)
         if not re.match(r'^\d{9}$', cleaned):
-            raise ValueError('FEIN must be 9 digits (XX-XXXXXXX format)')
-        # Format as XX-XXXXXXX
-        return f"{cleaned[:2]}-{cleaned[2:]}"
+            raise ValueError('FEIN must be exactly 9 digits')
+        return cleaned
 
     @field_validator('phone')
     def validate_phone(cls, v):
         if v is None:
             return v
-        # Remove all non-digit characters
+        # Clean phone number - store digits only
         digits = re.sub(r'\D', '', v)
-        # Check length
-        if len(digits) == 10:
-            # Format as (XXX) XXX-XXXX
-            return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
-        elif len(digits) == 11 and digits[0] == '1':
-            # Remove country code and format
-            digits = digits[1:]
-            return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
-        else:
-            raise ValueError('Phone number must be 10 digits')
+        # Validate length (business rule)
+        if len(digits) == 11 and digits[0] == '1':
+            digits = digits[1:]  # Remove country code
+        if len(digits) != 10:
+            raise ValueError('Phone number must be exactly 10 digits')
+        return digits
 
     @field_validator('entity_type')
     def validate_entity_type(cls, v):
         if v is None:
             return v
+        # Business rule validation
         valid_types = [
             'LLC', 'Corporation', 'S-Corp', 'C-Corp',
             'Partnership', 'Sole Proprietorship', 'LLP',
@@ -162,6 +154,7 @@ class MerchantBase(BaseModel):
     def validate_status(cls, v):
         if v is None:
             return 'lead'
+        # Workflow integrity validation (critical business rule)
         valid_statuses = [
             'lead', 'prospect', 'application_sent', 'application_received',
             'in_underwriting', 'approved', 'declined', 'funded', 'renewed',
@@ -175,27 +168,24 @@ class MerchantBase(BaseModel):
     def validate_submitted_date(cls, v):
         if v is None:
             return v
-        # Don't allow future dates
+        # Business rule: prevent future dates (data integrity)
         if v > date.today():
             raise ValueError('Submitted date cannot be in the future')
-        # Don't allow dates too far in the past (e.g., before 2000)
+        # Business rule: prevent unrealistic past dates
         if v.year < 2000:
-            raise ValueError('Submitted date seems too far in the past')
+            raise ValueError('Submitted date cannot be before year 2000')
         return v
 
     @field_validator('email')
-    def validate_email_format(cls, v):
+    def validate_email_security(cls, v):
         if v is None:
             return v
-        # Additional email validation beyond EmailStr
-        # Check for common typos
+        # Security validation: block disposable emails (anti-fraud)
         email_lower = v.lower()
-        if email_lower.endswith(('.con', '.cm', '.co', '.vom')):
-            raise ValueError('Email domain appears to have a typo')
-        # Check for disposable email domains (add more as needed)
         disposable_domains = [
             'tempmail.com', 'throwaway.email', 'guerrillamail.com',
-            'mailinator.com', '10minutemail.com'
+            'mailinator.com', '10minutemail.com', 'temp-mail.org',
+            'dispostable.com', 'yopmail.com', 'maildrop.cc'
         ]
         domain = email_lower.split('@')[-1]
         if domain in disposable_domains:
@@ -206,32 +196,22 @@ class MerchantBase(BaseModel):
     def validate_contact_person(cls, v):
         if v is None:
             return v
-        # Clean up whitespace
+        # Basic data cleaning
         v = ' '.join(v.split())
-        # Check for minimum meaningful length
+        # Minimum business requirement
         if len(v) < 2:
             raise ValueError('Contact person name must be at least 2 characters')
-        # Check that it contains at least one letter
-        if not re.search(r'[a-zA-Z]', v):
-            raise ValueError('Contact person name must contain letters')
-        # Check for obvious test data
-        test_names = ['test', 'testing', 'asdf', 'qwerty', 'xxx', 'na', 'n/a']
-        if v.lower() in test_names:
-            raise ValueError('Please provide a valid contact person name')
         return v
 
     @field_validator('city')
     def validate_city(cls, v):
         if v is None:
             return v
-        # Clean up whitespace
+        # Basic data cleaning
         v = ' '.join(v.split())
-        # Check for minimum length
+        # Minimum business requirement
         if len(v) < 2:
             raise ValueError('City name must be at least 2 characters')
-        # Check that it contains letters
-        if not re.search(r'[a-zA-Z]', v):
-            raise ValueError('City name must contain letters')
         return v
 
 
@@ -285,7 +265,7 @@ class MerchantUpdate(BaseModel):
         MerchantBase.validate_submitted_date
     )
     _validate_email = validator('email', allow_reuse=True)(
-        MerchantBase.validate_email_format
+        MerchantBase.validate_email_security
     )
     _validate_contact_person = validator('contact_person', allow_reuse=True)(
         MerchantBase.validate_contact_person

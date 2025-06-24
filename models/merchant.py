@@ -29,3 +29,4 @@ class Merchant(Base):
     # Relationships
     offers = relationship("Offer", back_populates="merchant")
     principals = relationship("Principal", back_populates="merchant", cascade="all, delete-orphan")
+    bank_accounts = relationship("BankAccount", back_populates="merchant", cascade="all, delete-orphan")

@@ -267,7 +267,6 @@ def get_merchant_ownership_summary(db: Session, merchant_id: int) -> Dict[str, A
                 {
                     "id": p.id,
                     "name": f"{p.first_name} {p.last_name}",
-                    "title": p.title,
                     "ownership_percentage": float(p.ownership_percentage or 0),
                     "is_primary_contact": p.is_primary_contact,
                     "is_guarantor": p.is_guarantor

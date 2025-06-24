@@ -20,11 +20,6 @@ class PrincipalBase(BaseModel):
         max_length=100,
         description="Principal's last name"
     )
-    title: Optional[str] = Field(
-        None,
-        max_length=100,
-        description="Title/Position (CEO, President, Owner, etc.)"
-    )
     ownership_percentage: Optional[Decimal] = Field(
         default=100.00,
         ge=0,
@@ -99,35 +94,6 @@ class PrincipalBase(BaseModel):
             # Check for minimum meaningful length
             if len(v.replace(' ', '').replace('-', '').replace("'", '').replace('.', '')) < 1:
                 raise ValueError('Name must contain at least one letter')
-        return v
-
-    @field_validator('title')
-    @classmethod
-    def validate_title(cls, v: Optional[str]) -> Optional[str]:
-        if v:
-            v = v.strip()
-            # Normalize common titles
-            title_map = {
-                'ceo': 'CEO',
-                'cfo': 'CFO',
-                'coo': 'COO',
-                'cto': 'CTO',
-                'president': 'President',
-                'vice president': 'Vice President',
-                'vp': 'VP',
-                'owner': 'Owner',
-                'partner': 'Partner',
-                'member': 'Member',
-                'manager': 'Manager',
-                'managing member': 'Managing Member',
-                'managing partner': 'Managing Partner',
-                'director': 'Director',
-                'chairman': 'Chairman',
-                'founder': 'Founder',
-                'co-founder': 'Co-Founder',
-            }
-            v_lower = v.lower()
-            return title_map.get(v_lower, v)
         return v
 
     @field_validator('ssn')
@@ -291,7 +257,6 @@ class PrincipalCreate(PrincipalBase):
 class PrincipalUpdate(BaseModel):
     first_name: Optional[str] = Field(None, min_length=1, max_length=100)
     last_name: Optional[str] = Field(None, min_length=1, max_length=100)
-    title: Optional[str] = Field(None, max_length=100)
     ownership_percentage: Optional[Decimal] = Field(
         None,
         ge=0,
@@ -312,7 +277,6 @@ class PrincipalUpdate(BaseModel):
 
     # Apply the same validators as PrincipalBase
     _validate_name = field_validator('first_name', 'last_name')(PrincipalBase.validate_name)
-    _validate_title = field_validator('title')(PrincipalBase.validate_title)
     _validate_ssn = field_validator('ssn')(PrincipalBase.validate_ssn)
     _validate_date_of_birth = field_validator('date_of_birth')(PrincipalBase.validate_date_of_birth)
     _validate_state = field_validator('state')(PrincipalBase.validate_state)

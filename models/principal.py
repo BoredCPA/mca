@@ -13,7 +13,6 @@ class Principal(Base):
     # Personal Information
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
-    title = Column(String)  # CEO, President, Owner, Partner, Member, etc.
     ownership_percentage = Column(Numeric(5, 2), default=100.00)  # 0.00 to 100.00
 
     # Sensitive Information (should be encrypted in production)

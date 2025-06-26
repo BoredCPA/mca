@@ -13,8 +13,11 @@ def calculate_offer_fields(offer_data: dict) -> dict:
     advance = offer_data.get('advance', 0)
     factor = offer_data.get('factor', 0)
     upfront_fees = offer_data.get('upfront_fees', 0)
-    specified_percentage = offer_data.get('specified_percentage', 0)
     payment_frequency = offer_data.get('payment_frequency', 'daily')
+
+    # Get either number_of_periods or payment_amount from user
+    number_of_periods = offer_data.get('number_of_periods', None)
+    payment_amount = offer_data.get('payment_amount', None)
 
     # Calculate RTR (Return to Remit)
     rtr = advance * factor
@@ -22,25 +25,41 @@ def calculate_offer_fields(offer_data: dict) -> dict:
     # Calculate net funds
     net_funds = advance - upfront_fees
 
-    # Calculate daily payment amount
-    payment_amount = (rtr * specified_percentage) / 100
+    # Calculate payment amount based on what user provided
+    if number_of_periods and number_of_periods > 0:
+        # User provided number of periods (e.g., 22 weeks)
+        payment_amount = rtr / number_of_periods
+    elif payment_amount:
+        # User provided fixed payment amount (e.g., $500 daily)
+        # Payment amount is already set by user
+        pass
+    else:
+        # Neither provided - set to 0 or raise error
+        payment_amount = 0
+
+    # Calculate total number of payments if payment_amount is provided
+    if payment_amount and payment_amount > 0 and not number_of_periods:
+        number_of_periods = rtr / payment_amount
 
     # Calculate APR (simplified calculation)
     # This is a basic calculation - you may want to refine this
     total_cost = rtr - advance
-    if advance > 0:
-        cost_percentage = (total_cost / advance) * 100
-        # Annualize based on payment frequency
+    if advance > 0 and number_of_periods and number_of_periods > 0:
+        # Calculate based on actual term length
         if payment_frequency == 'daily':
-            apr = cost_percentage * 365 / 250  # Assuming 250 business days
+            days = number_of_periods
+            apr = (total_cost / advance) * (365 / days) * 100
         elif payment_frequency == 'weekly':
-            apr = cost_percentage * 52
+            weeks = number_of_periods
+            apr = (total_cost / advance) * (52 / weeks) * 100
         elif payment_frequency == 'bi-weekly':
-            apr = cost_percentage * 26
+            biweeks = number_of_periods
+            apr = (total_cost / advance) * (26 / biweeks) * 100
         elif payment_frequency == 'monthly':
-            apr = cost_percentage * 12
+            months = number_of_periods
+            apr = (total_cost / advance) * (12 / months) * 100
         else:
-            apr = cost_percentage
+            apr = 0
     else:
         apr = 0
 
@@ -48,6 +67,7 @@ def calculate_offer_fields(offer_data: dict) -> dict:
         'rtr': rtr,
         'net_funds': net_funds,
         'payment_amount': payment_amount,
+        'number_of_periods': number_of_periods,
         'apr': apr
     })
 
@@ -92,17 +112,18 @@ def update_offer(db: Session, offer_id: int, offer_update: OfferUpdate):
 
         # Recalculate fields if financial data changed
         if any(field in update_data for field in
-               ['advance', 'factor', 'upfront_fees', 'specified_percentage', 'payment_frequency']):
+               ['advance', 'factor', 'upfront_fees', 'number_of_periods', 'payment_amount', 'payment_frequency']):
             # Merge current data with updates
             current_data = {
                 'advance': db_offer.advance,
                 'factor': db_offer.factor,
                 'upfront_fees': db_offer.upfront_fees,
-                'specified_percentage': db_offer.specified_percentage,
+                'number_of_periods': getattr(db_offer, 'number_of_periods', None),
+                'payment_amount': db_offer.payment_amount,
                 'payment_frequency': db_offer.payment_frequency,
             }
             current_data.update(update_data)
-            update_data = calculate_offer_fields(update_data)
+            update_data = calculate_offer_fields(current_data)
 
         # Handle status change timestamps
         if 'status' in update_data:

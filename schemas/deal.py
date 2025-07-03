@@ -1,9 +1,14 @@
 # app/schemas/deal.py
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from decimal import Decimal
 from datetime import datetime, date
 from typing import Optional, List
 from enum import Enum
+
+from app.schemas.merchant import Merchant
+from app.schemas.offer import Offer
+from app.schemas.banking import BankAccountBase
+from app.schemas.payment import Payment
 
 
 class DealStatus(str, Enum):
@@ -26,22 +31,20 @@ class DealBase(BaseModel):
     offer_id: int = Field(..., description="ID of the accepted offer")
     bank_account_id: Optional[int] = Field(None, description="ID of the bank account for funding")
 
-    # Financial terms
     funded_amount: Decimal = Field(..., gt=0, decimal_places=2)
     factor_rate: Decimal = Field(..., gt=1, le=2, decimal_places=4)
     payment_amount: Decimal = Field(..., gt=0, decimal_places=2)
     payment_frequency: PaymentFrequency
     number_of_payments: int = Field(..., gt=0)
 
-    # Dates
     funding_date: date
     first_payment_date: date
 
-    # Optional fields
     notes: Optional[str] = Field(None, max_length=2000)
     created_by: Optional[str] = Field(None, max_length=100)
 
-    @validator('first_payment_date')
+    @field_validator('first_payment_date')
+    @classmethod
     def validate_first_payment_date(cls, v, values):
         if 'funding_date' in values and v < values['funding_date']:
             raise ValueError('First payment date cannot be before funding date')
@@ -57,8 +60,6 @@ class DealCreate(BaseModel):
     notes: Optional[str] = None
     created_by: Optional[str] = None
 
-    # Financial terms will be copied from the offer
-
 
 class DealUpdate(BaseModel):
     bank_account_id: Optional[int] = None
@@ -73,47 +74,35 @@ class Deal(DealBase):
     id: int
     deal_number: str
 
-    # Calculated fields
     rtr_amount: Decimal
     maturity_date: date
 
-    # Balance tracking
     total_paid: Decimal
-    balance_remaining: Decimal  # This is RTR - total_paid
+    balance_remaining: Decimal
     payments_remaining: int
     last_payment_date: Optional[date]
 
-    # Status fields
     status: DealStatus
     actual_completion_date: Optional[date]
 
-    # Collections
     in_collections: bool
     collections_notes: Optional[str]
 
-    # Timestamps
     created_at: datetime
     updated_at: Optional[datetime]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class DealWithRelations(Deal):
-    """Deal with related entities included"""
-    from app.schemas.merchant import Merchant
-    from app.schemas.offer import Offer
-    from app.schemas.banking import BankAccount
-    from app.schemas.payment import Payment
-
     merchant: Merchant
     offer: Offer
-    bank_account: Optional[BankAccount]
+    bank_account: Optional[BankAccountBase]
     payments: List[Payment] = []
 
 
 class DealSummary(BaseModel):
-    """Summary statistics for deals"""
     total_deals: int
     active_deals: int
     completed_deals: int
@@ -123,21 +112,19 @@ class DealSummary(BaseModel):
     total_outstanding: Decimal
     average_factor_rate: Decimal
     average_deal_size: Decimal
-    completion_rate: float  # Percentage of deals completed successfully
+    completion_rate: float
 
 
 class DealPerformance(BaseModel):
-    """Performance metrics for a specific deal"""
     deal_id: int
     deal_number: str
-    payment_performance: float  # Percentage of payments made on time
+    payment_performance: float
     projected_completion_date: Optional[date]
-    roi: Decimal  # Return on investment
-    irr: Optional[Decimal]  # Internal rate of return
+    roi: Decimal
+    irr: Optional[Decimal]
 
 
 class DealFilter(BaseModel):
-    """Filters for searching deals"""
     merchant_id: Optional[int] = None
     status: Optional[DealStatus] = None
     funding_date_from: Optional[date] = None

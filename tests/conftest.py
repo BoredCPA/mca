@@ -5,17 +5,18 @@ from sqlalchemy.orm import sessionmaker, Session
 from fastapi.testclient import TestClient
 from typing import Generator
 import os
+import sys
 from datetime import date, datetime
 from decimal import Decimal
 
-# Add app to path
-import sys
+# Add the parent directory (app's parent) to Python path
+# This allows us to import from 'app' package
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+# Now we can import from app
 from app.database import Base, get_db
-from app.main import app  # You'll need to create this
-from app.models import *  # Import all models
+from main import app
+from models import *  # Import all models
 
 # Test database URL
 TEST_DATABASE_URL = "sqlite:///./test_mca_crm.db"

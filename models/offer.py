@@ -26,6 +26,7 @@ class Offer(Base):
     net_funds = Column(Numeric(12, 2))  # advance - upfront_fees
     payment_amount = Column(Numeric(12, 2))
     apr = Column(Numeric(5, 2))
+    number_of_periods = Column(Integer, nullable=True)  # Add this field
 
     # Status tracking
     status = Column(String, default="draft")  # draft, sent, selected, funded
@@ -37,9 +38,11 @@ class Offer(Base):
     selected_at = Column(DateTime, nullable=True)
     funded_at = Column(DateTime, nullable=True)
 
-    # Relationship
-    merchant = relationship("Merchant", back_populates="offers")
-
+    # Soft delete fields
     is_deleted = Column(Boolean, default=False, nullable=False)
     deleted_at = Column(DateTime, nullable=True)
     deleted_by = Column(String(100), nullable=True)
+
+    # Relationships
+    merchant = relationship("Merchant", back_populates="offers")
+    deal = relationship("Deal", back_populates="offer", uselist=False)  # One-to-one relationship

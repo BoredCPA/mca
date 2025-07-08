@@ -40,6 +40,6 @@ class Principal(Base):
     # Relationships
     merchant = relationship("Merchant", back_populates="principals")
 
-# Update the Merchant model to include the relationship
-# Add this to your existing merchant.py model file:
-# principals = relationship("Principal", back_populates="merchant")
+    is_deleted = Column(Boolean, default=False, nullable=False)
+    deleted_at = Column(DateTime, nullable=True)
+    deleted_by = Column(String(100), nullable=True)

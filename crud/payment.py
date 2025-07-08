@@ -17,19 +17,27 @@ def create_payment(db: Session, payment: PaymentCreate) -> PaymentModel:
     return db_payment
 
 
-def get_payment(db: Session, payment_id: int) -> Optional[PaymentModel]:
+def get_payment(db: Session, payment_id: int, include_deleted: bool = False) -> Optional[PaymentModel]:
     """Get a specific payment by ID"""
-    return db.query(PaymentModel).filter(PaymentModel.id == payment_id).first()
+    query = db.query(PaymentModel).filter(PaymentModel.id == payment_id)
 
+    if not include_deleted:
+        query = query.filter(PaymentModel.is_deleted == False)
+
+    return query.first()
 
 def get_payments(
         db: Session,
         skip: int = 0,
         limit: int = 100,
-        filters: Optional[PaymentFilter] = None
+        filters: Optional[PaymentFilter] = None,
+        include_deleted: bool = False
 ) -> List[PaymentModel]:
     """Get payments with optional filtering"""
     query = db.query(PaymentModel)
+
+    if not include_deleted:
+        query = query.filter(PaymentModel.is_deleted == False)
 
     if filters:
         if filters.deal_id:
@@ -50,16 +58,22 @@ def get_payments(
     return query.order_by(PaymentModel.date.desc()).offset(skip).limit(limit).all()
 
 
-def get_payments_by_deal(db: Session, deal_id: int) -> List[PaymentModel]:
+def get_payments_by_deal(db: Session, deal_id: int, include_deleted: bool = False) -> List[PaymentModel]:
     """Get all payments for a specific deal"""
-    return db.query(PaymentModel).filter(
-        PaymentModel.deal_id == deal_id
-    ).order_by(PaymentModel.date.desc()).all()
+    query = db.query(PaymentModel).filter(PaymentModel.deal_id == deal_id)
+
+    if not include_deleted:
+        query = query.filter(PaymentModel.is_deleted == False)
+
+    return query.order_by(PaymentModel.date.desc()).all()
 
 
-def get_payment_summary_by_deal(db: Session, deal_id: int) -> PaymentSummary:
+def get_payment_summary_by_deal(db: Session, deal_id: int, include_deleted: bool = False) -> PaymentSummary:
     """Get payment summary statistics for a deal"""
     payments = db.query(PaymentModel).filter(PaymentModel.deal_id == deal_id).all()
+
+    if not include_deleted:
+        payments = payments.filter(PaymentModel.is_deleted == False)
 
     if not payments:
         return PaymentSummary(
@@ -93,11 +107,17 @@ def get_recent_payments(db: Session, days: int = 7, limit: int = 50) -> List[Pay
     ).order_by(PaymentModel.date.desc()).limit(limit).all()
 
 
-def get_bounced_payments(db: Session, deal_id: Optional[int] = None) -> List[PaymentModel]:
-    """Get all bounced payments, optionally filtered by deal"""
+def get_bounced_payments(db: Session, deal_id: Optional[int] = None, include_deleted: bool = False) -> List[
+    PaymentModel]:
+    """Get all bounced payments"""
     query = db.query(PaymentModel).filter(PaymentModel.bounced == True)
+
+    if not include_deleted:
+        query = query.filter(PaymentModel.is_deleted == False)
+
     if deal_id:
         query = query.filter(PaymentModel.deal_id == deal_id)
+
     return query.order_by(PaymentModel.date.desc()).all()
 
 
@@ -135,12 +155,32 @@ def mark_payment_bounced(db: Session, payment_id: int, bounced: bool = True, not
     return db_payment
 
 
-def delete_payment(db: Session, payment_id: int) -> bool:
-    """Delete a payment record"""
-    db_payment = db.query(PaymentModel).filter(PaymentModel.id == payment_id).first()
+def delete_payment(db: Session, payment_id: int, deleted_by: str = None) -> bool:
+    """Delete a payment record (soft delete)"""
+    db_payment = db.query(PaymentModel).filter(
+        PaymentModel.id == payment_id,
+        PaymentModel.is_deleted == False  # Don't delete if already deleted
+    ).first()
 
     if db_payment:
-        db.delete(db_payment)
+        # IMPORTANT: In a financial system, you might want to prevent
+        # payment deletion entirely or require special permissions
+
+        # Optional: Add business rule checks
+        # For example, don't delete payments that have been reconciled
+        # if db_payment.reconciled:
+        #     raise ValueError("Cannot delete reconciled payments")
+
+        # Soft delete
+        db_payment.is_deleted = True
+        db_payment.deleted_at = datetime.utcnow()
+        db_payment.deleted_by = deleted_by
+
+        # Important: Update the deal balance when deleting a payment
+        # This ensures the deal's balance_remaining is recalculated
+        from app.crud.deal import update_deal_balance
+        update_deal_balance(db, db_payment.deal_id)
+
         db.commit()
         return True
 
@@ -160,3 +200,24 @@ def get_payment_stats_by_type(db: Session, deal_id: Optional[int] = None):
         query = query.filter(PaymentModel.deal_id == deal_id)
 
     return query.group_by(PaymentModel.type).all()
+
+
+def restore_payment(db: Session, payment_id: int) -> Optional[PaymentModel]:
+    """Restore a soft-deleted payment"""
+    db_payment = db.query(PaymentModel).filter(
+        PaymentModel.id == payment_id,
+        PaymentModel.is_deleted == True
+    ).first()
+
+    if db_payment:
+        db_payment.is_deleted = False
+        db_payment.deleted_at = None
+        db_payment.deleted_by = None
+
+        # Important: Update deal balance after restoring
+        from app.crud.deal import update_deal_balance
+        update_deal_balance(db, db_payment.deal_id)
+
+        db.commit()
+
+    return db_payment

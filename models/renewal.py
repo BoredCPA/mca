@@ -70,6 +70,10 @@ class DealRenewalRelationship(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+    is_deleted = Column(Boolean, default=False, nullable=False)
+    deleted_at = Column(DateTime, nullable=True)
+    deleted_by = Column(String(100), nullable=True)
+
     # Relationships
     old_deal = relationship("Deal", foreign_keys=[old_deal_id], backref="renewed_to_relationships")
     new_deal = relationship("Deal", foreign_keys=[new_deal_id], backref="renewed_from_relationships")

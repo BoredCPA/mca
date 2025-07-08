@@ -1,5 +1,5 @@
 # app/models/merchant.py
-from sqlalchemy import Column, Integer, String, Text, Date, DateTime, func
+from sqlalchemy import Column, Integer, String, Text, Date, DateTime, func, Boolean
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -28,5 +28,11 @@ class Merchant(Base):
 
     # Relationships
     offers = relationship("Offer", back_populates="merchant")
-    principals = relationship("Principal", back_populates="merchant", cascade="all, delete-orphan")
-    bank_accounts = relationship("BankAccount", back_populates="merchant", cascade="all, delete-orphan")
+    principals = relationship("Principal", back_populates="merchant")  # No cascade
+    bank_accounts = relationship("BankAccount", back_populates="merchant")  # No cascade
+    deals = relationship("Deal", back_populates="merchant")  # No cascade
+
+    # Add:
+    is_deleted = Column(Boolean, default=False, nullable=False)
+    deleted_at = Column(DateTime, nullable=True)
+    deleted_by = Column(String(100), nullable=True)

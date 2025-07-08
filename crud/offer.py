@@ -86,22 +86,40 @@ def create_offer(db: Session, offer: OfferCreate):
     return db_offer
 
 
-def get_offers(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(OfferModel).offset(skip).limit(limit).all()
+def get_offers(db: Session, skip: int = 0, limit: int = 100, include_deleted: bool = False):
+    query = db.query(OfferModel)
+
+    if not include_deleted:
+        query = query.filter(OfferModel.is_deleted == False)
+
+    return query.offset(skip).limit(limit).all()
 
 
-def get_offer(db: Session, offer_id: int):
-    return db.query(OfferModel).filter(OfferModel.id == offer_id).first()
+def get_offer(db: Session, offer_id: int, include_deleted: bool = False):
+    query = db.query(OfferModel).filter(OfferModel.id == offer_id)
+
+    if not include_deleted:
+        query = query.filter(OfferModel.is_deleted == False)
+
+    return query.first()
 
 
-def get_offers_by_merchant(db: Session, merchant_id: int):
-    return db.query(OfferModel).filter(OfferModel.merchant_id == merchant_id).order_by(
-        OfferModel.created_at.desc()).all()
+def get_offers_by_merchant(db: Session, merchant_id: int, include_deleted: bool = False):
+    query = db.query(OfferModel).filter(OfferModel.merchant_id == merchant_id)
+
+    if not include_deleted:
+        query = query.filter(OfferModel.is_deleted == False)
+
+    return query.order_by(OfferModel.created_at.desc()).all()
 
 
 def get_selected_offer_by_merchant(db: Session, merchant_id: int):
     return db.query(OfferModel).filter(
-        and_(OfferModel.merchant_id == merchant_id, OfferModel.status == "selected")
+        and_(
+            OfferModel.merchant_id == merchant_id,
+            OfferModel.status == "selected",
+            OfferModel.is_deleted == False  # Add this check
+        )
     ).first()
 
 
@@ -142,9 +160,44 @@ def update_offer(db: Session, offer_id: int, offer_update: OfferUpdate):
     return db_offer
 
 
-def delete_offer(db: Session, offer_id: int):
-    db_offer = db.query(OfferModel).filter(OfferModel.id == offer_id).first()
+def delete_offer(db: Session, offer_id: int, deleted_by: str = None) -> Optional[OfferModel]:
+    db_offer = db.query(OfferModel).filter(
+        OfferModel.id == offer_id,
+        OfferModel.is_deleted == False  # Don't delete if already deleted
+    ).first()
+
     if db_offer:
-        db.delete(db_offer)
+        # Check if offer is in a state that shouldn't be deleted
+        if db_offer.status in ["funded", "selected"]:
+            raise ValueError(
+                f"Cannot delete offer with status '{db_offer.status}'. "
+                "Only draft, sent, or withdrawn offers can be deleted."
+            )
+
+        # Soft delete
+        db_offer.is_deleted = True
+        db_offer.deleted_at = datetime.utcnow()
+        db_offer.deleted_by = deleted_by
+
+        # Optionally update status to show it was deleted
+        # db_offer.status = "withdrawn"  # Optional
+
         db.commit()
+
+    return db_offer
+
+
+def restore_offer(db: Session, offer_id: int) -> Optional[OfferModel]:
+    """Restore a soft-deleted offer"""
+    db_offer = db.query(OfferModel).filter(
+        OfferModel.id == offer_id,
+        OfferModel.is_deleted == True
+    ).first()
+
+    if db_offer:
+        db_offer.is_deleted = False
+        db_offer.deleted_at = None
+        db_offer.deleted_by = None
+        db.commit()
+
     return db_offer

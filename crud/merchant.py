@@ -62,14 +62,19 @@ def create_merchant(db: Session, merchant: MerchantCreate) -> MerchantModel:
         raise MerchantCRUDError(f"Unexpected error: {str(e)}")
 
 
-def get_merchant(db: Session, merchant_id: int) -> Optional[MerchantModel]:
+def get_merchant(db: Session, merchant_id: int, include_deleted: bool = False) -> Optional[MerchantModel]:
     """
     Get a single merchant by ID
     """
     try:
-        merchant = db.query(MerchantModel).filter(
+        query = db.query(MerchantModel).filter(
             MerchantModel.id == merchant_id
-        ).first()
+        )
+
+        if not include_deleted:
+            query = query.filter(MerchantModel.is_deleted == False)
+
+        merchant = query.first()
         return merchant
     except SQLAlchemyError as e:
         logger.error(f"Error fetching merchant {merchant_id}: {str(e)}")
@@ -97,7 +102,8 @@ def get_merchants(
         status: Optional[str] = None,
         search: Optional[str] = None,
         sort_by: str = "created_at",
-        sort_order: str = "desc"
+        sort_order: str = "desc",
+        include_deleted: bool = False
 ) -> List[MerchantModel]:
     """
     Get merchants with filtering, pagination, and sorting
@@ -108,6 +114,9 @@ def get_merchants(
         # Apply filters
         if status:
             query = query.filter(MerchantModel.status == status)
+
+        if not include_deleted:
+            query = query.filter(MerchantModel.is_deleted == False)
 
         if search:
             search_term = f"%{search}%"
@@ -133,6 +142,32 @@ def get_merchants(
         logger.error(f"Error fetching merchants: {str(e)}")
         raise MerchantCRUDError(f"Failed to fetch merchants: {str(e)}")
 
+
+def restore_merchant(db: Session, merchant_id: int) -> Optional[MerchantModel]:
+    """
+    Restore a soft-deleted merchant
+    """
+    try:
+        db_merchant = db.query(MerchantModel).filter(
+            MerchantModel.id == merchant_id,
+            MerchantModel.is_deleted == True
+        ).first()
+
+        if not db_merchant:
+            return None
+
+        db_merchant.is_deleted = False
+        db_merchant.deleted_at = None
+        db_merchant.deleted_by = None
+
+        db.commit()
+        logger.info(f"Restored merchant: {merchant_id}")
+        return db_merchant
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Error restoring merchant {merchant_id}: {str(e)}")
+        raise MerchantCRUDError(f"Failed to restore merchant: {str(e)}")
 
 def count_merchants(
         db: Session,
@@ -220,13 +255,14 @@ def update_merchant(
         raise MerchantCRUDError(f"Failed to update merchant: {str(e)}")
 
 
-def delete_merchant(db: Session, merchant_id: int) -> bool:
+def delete_merchant(db: Session, merchant_id: int, deleted_by: str = None) -> bool:
     """
-    Delete a merchant (soft delete by setting status to 'closed')
+    Delete a merchant (soft delete by setting is_deleted flag)
     """
     try:
         db_merchant = db.query(MerchantModel).filter(
-            MerchantModel.id == merchant_id
+            MerchantModel.id == merchant_id,
+            MerchantModel.is_deleted == False  # Don't delete already deleted
         ).first()
 
         if not db_merchant:
@@ -236,6 +272,7 @@ def delete_merchant(db: Session, merchant_id: int) -> bool:
         from app.models.offer import Offer
         active_offers = db.query(Offer).filter(
             Offer.merchant_id == merchant_id,
+            Offer.is_deleted == False,  # Also check offer isn't deleted
             Offer.status.in_(["sent", "selected", "funded"])
         ).count()
 
@@ -245,19 +282,22 @@ def delete_merchant(db: Session, merchant_id: int) -> bool:
                 "Please close or delete all offers first."
             )
 
-        # Soft delete by setting status
-        db_merchant.status = "closed"
-        db_merchant.updated_at = datetime.utcnow()
+        # Soft delete using is_deleted
+        db_merchant.is_deleted = True
+        db_merchant.deleted_at = datetime.utcnow()
+        db_merchant.deleted_by = deleted_by
+
+        # Keep status as is - might be useful to know what status they were in
+        # db_merchant.status = "closed"  # Optional: uncomment if you want this too
 
         db.commit()
-        logger.info(f"Soft deleted merchant: {merchant_id}")
+        logger.info(f"Soft deleted merchant: {merchant_id} by {deleted_by}")
         return True
 
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Error deleting merchant {merchant_id}: {str(e)}")
         raise MerchantCRUDError(f"Failed to delete merchant: {str(e)}")
-
 
 def get_merchant_stats(db: Session) -> Dict[str, Any]:
     """

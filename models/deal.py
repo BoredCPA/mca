@@ -64,3 +64,8 @@ class Deal(Base):
     payments = relationship("Payment", back_populates="deal", cascade="all, delete-orphan")
     renewal_junctions = relationship("DealRenewalJunction", back_populates="deal",
                                      foreign_keys="DealRenewalJunction.deal_id")
+
+
+    is_deleted = Column(Boolean, default=False, nullable=False)
+    deleted_at = Column(DateTime, nullable=True)
+    deleted_by = Column(String(100), nullable=True)

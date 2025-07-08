@@ -31,6 +31,10 @@ class BankAccount(Base):
     # If you have a Deal model, uncomment this:
     # deals = relationship("Deal", back_populates="bank_account")
 
+    is_deleted = Column(Boolean, default=False, nullable=False)
+    deleted_at = Column(DateTime, nullable=True)
+    deleted_by = Column(String(100), nullable=True)
+
     __table_args__ = (
         CheckConstraint(
             "account_type IN ('checking', 'savings')",

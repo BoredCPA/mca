@@ -4,6 +4,7 @@ from sqlalchemy import and_
 from typing import List, Optional
 from app.models.banking import BankAccount
 from app.schemas.banking import BankAccountCreate, BankAccountUpdate
+import datetime
 from fastapi import HTTPException
 
 
@@ -32,10 +33,16 @@ class CRUDBankAccount:
         db.refresh(db_bank_account)
         return db_bank_account
 
-    def get(self, db: Session, bank_account_id: int) -> Optional[BankAccount]:
-        return db.query(BankAccount).filter(
+    def get(self, db: Session, bank_account_id: int, include_deleted: bool = False) -> Optional[BankAccount]:
+        query = db.query(BankAccount).filter(
             BankAccount.id == bank_account_id
-        ).first()
+        )
+
+        # By default, exclude deleted records
+        if not include_deleted:
+            query = query.filter(BankAccount.is_deleted == False)
+
+        return query.first()
 
     def get_by_merchant(
             self,
@@ -43,11 +50,16 @@ class CRUDBankAccount:
             merchant_id: int,
             skip: int = 0,
             limit: int = 100,
-            active_only: bool = False
+            active_only: bool = False,
+            include_deleted: bool = False
     ) -> List[BankAccount]:
         query = db.query(BankAccount).filter(
             BankAccount.merchant_id == merchant_id
         )
+
+        # Exclude deleted unless specifically requested
+        if not include_deleted:
+            query = query.filter(BankAccount.is_deleted == False)
 
         if active_only:
             query = query.filter(BankAccount.is_active == True)
@@ -83,22 +95,47 @@ class CRUDBankAccount:
         db.refresh(db_bank_account)
         return db_bank_account
 
-    def delete(self, db: Session, bank_account_id: int) -> bool:
+    def delete(self, db: Session, bank_account_id: int, deleted_by: str = None) -> bool:
         db_bank_account = self.get(db, bank_account_id)
         if not db_bank_account:
             return False
 
-        # Check if bank account is in use by any deals
-        # Uncomment when you have deals implemented:
-        # if db_bank_account.deals:
-        #     raise HTTPException(
-        #         status_code=400,
-        #         detail="Cannot delete bank account that is associated with deals"
-        #     )
+        # Check if already deleted
+        if db_bank_account.is_deleted:
+            return False  # Already deleted, nothing to do
 
-        db.delete(db_bank_account)
+        # Soft delete - just mark as deleted
+        db_bank_account.is_deleted = True
+        db_bank_account.deleted_at = datetime.utcnow()
+        db_bank_account.deleted_by = deleted_by
+
+        # Also deactivate it
+        db_bank_account.is_active = False
+
         db.commit()
         return True
+
+    def restore(self, db: Session, bank_account_id: int) -> Optional[BankAccount]:
+        """Restore a soft-deleted bank account"""
+        # Need to include deleted records in search
+        db_bank_account = self.get(db, bank_account_id, include_deleted=True)
+
+        if not db_bank_account:
+            return None
+
+        if not db_bank_account.is_deleted:
+            return db_bank_account  # Not deleted, nothing to restore
+
+        # Restore
+        db_bank_account.is_deleted = False
+        db_bank_account.deleted_at = None
+        db_bank_account.deleted_by = None
+        # Note: Don't automatically reactivate - that's a business decision
+        # db_bank_account.is_active = True  # Uncomment if you want this
+
+        db.commit()
+        db.refresh(db_bank_account)
+        return db_bank_account
 
     def set_primary(
             self,

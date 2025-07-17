@@ -1,11 +1,11 @@
-# app/routes/merchant.py
+# app/routes/merchant.py - Updated for soft deletes
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from app.schemas.merchant import (
     Merchant, MerchantCreate, MerchantUpdate, MerchantListResponse
 )
 from app.crud import merchant as merchant_crud
-from app.crud.merchant import DuplicateFEINError, MerchantCRUDError
+from app.crud.merchant import MerchantCRUDError  # Removed DuplicateFEINError
 from app.database import get_db
 from typing import List, Optional
 import logging
@@ -23,16 +23,9 @@ def create_merchant(
         merchant: MerchantCreate,
         db: Session = Depends(get_db)
 ):
-    """
-    Create a new merchant with full validation
-    """
+    """Create a new merchant with full validation"""
     try:
         return merchant_crud.create_merchant(db, merchant)
-    except DuplicateFEINError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(e)
-        )
     except MerchantCRUDError as e:
         logger.error(f"Error creating merchant: {str(e)}")
         raise HTTPException(
@@ -57,9 +50,7 @@ def read_merchants(
         sort_order: str = Query("desc", regex="^(asc|desc)$"),
         db: Session = Depends(get_db)
 ):
-    """
-    Get merchants with pagination, filtering, and sorting
-    """
+    """Get merchants with pagination, filtering, and sorting"""
     try:
         merchants = merchant_crud.get_merchants(
             db,
@@ -92,9 +83,7 @@ def read_merchant(
         merchant_id: int,
         db: Session = Depends(get_db)
 ):
-    """
-    Get a specific merchant by ID
-    """
+    """Get a specific merchant by ID"""
     try:
         merchant = merchant_crud.get_merchant(db, merchant_id=merchant_id)
         if merchant is None:
@@ -116,9 +105,7 @@ def read_merchant_by_fein(
         fein: str,
         db: Session = Depends(get_db)
 ):
-    """
-    Get a merchant by FEIN
-    """
+    """Get a merchant by FEIN"""
     try:
         merchant = merchant_crud.get_merchant_by_fein(db, fein=fein)
         if merchant is None:
@@ -141,9 +128,7 @@ def update_merchant(
         merchant_update: MerchantUpdate,
         db: Session = Depends(get_db)
 ):
-    """
-    Update a merchant
-    """
+    """Update a merchant"""
     try:
         merchant = merchant_crud.update_merchant(
             db,
@@ -156,11 +141,6 @@ def update_merchant(
                 detail="Merchant not found"
             )
         return merchant
-    except DuplicateFEINError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(e)
-        )
     except MerchantCRUDError as e:
         logger.error(f"Error updating merchant {merchant_id}: {str(e)}")
         raise HTTPException(
@@ -175,9 +155,7 @@ def update_merchant_status(
         status: str = Query(..., regex="^(lead|prospect|applicant|approved|declined|funded|closed)$"),
         db: Session = Depends(get_db)
 ):
-    """
-    Update only the merchant status
-    """
+    """Update only the merchant status"""
     try:
         merchant_update = MerchantUpdate(status=status)
         merchant = merchant_crud.update_merchant(
@@ -202,13 +180,12 @@ def update_merchant_status(
 @router.delete("/merchants/{merchant_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_merchant(
         merchant_id: int,
+        deleted_by: str = Query("system", description="User who deleted the merchant"),
         db: Session = Depends(get_db)
 ):
-    """
-    Delete a merchant (soft delete)
-    """
+    """Delete a merchant (soft delete)"""
     try:
-        success = merchant_crud.delete_merchant(db, merchant_id=merchant_id)
+        success = merchant_crud.delete_merchant(db, merchant_id=merchant_id, deleted_by=deleted_by)
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -222,11 +199,31 @@ def delete_merchant(
         )
 
 
+@router.post("/merchants/{merchant_id}/restore", response_model=Merchant)
+def restore_merchant(
+        merchant_id: int,
+        db: Session = Depends(get_db)
+):
+    """Restore a soft-deleted merchant"""
+    try:
+        merchant = merchant_crud.restore_merchant(db, merchant_id=merchant_id)
+        if merchant is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Deleted merchant not found"
+            )
+        return merchant
+    except MerchantCRUDError as e:
+        logger.error(f"Error restoring merchant {merchant_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
 @router.get("/merchants/stats/summary")
 def get_merchant_statistics(db: Session = Depends(get_db)):
-    """
-    Get merchant statistics summary
-    """
+    """Get merchant statistics summary"""
     try:
         stats = merchant_crud.get_merchant_stats(db)
         return stats

@@ -42,6 +42,16 @@ def calculate_total_ownership(db: Session, merchant_id: int, exclude_principal_i
     principals = query.all()
     return sum(p.ownership_percentage or 0 for p in principals)
 
+def get_all_principals(
+    db: Session,
+    skip: int = 0,
+    limit: int = 1000
+) -> List[PrincipalModel]:
+    """Get all active principals (excludes soft deleted)"""
+    return db.query(PrincipalModel).filter(
+        PrincipalModel.is_deleted == False
+    ).offset(skip).limit(limit).all()
+
 
 def create_principal(db: Session, principal: PrincipalCreate) -> PrincipalModel:
     """Create a new principal with validation"""

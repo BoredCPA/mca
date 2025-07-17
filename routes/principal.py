@@ -20,6 +20,30 @@ router = APIRouter(
 logger = logging.getLogger(__name__)
 
 
+# Add this to your routes/principal.py file
+
+@router.get("/principals/", response_model=List[Principal])
+def get_all_principals(
+        skip: int = Query(0, ge=0, description="Number of records to skip"),
+        limit: int = Query(1000, ge=1, le=10000, description="Maximum number of records to return"),
+        db: Session = Depends(get_db)
+):
+    """
+    Get all active principals across all merchants
+
+    - **skip**: Pagination offset
+    - **limit**: Maximum records to return
+    """
+    try:
+        principals = principal_crud.get_all_principals(db, skip=skip, limit=limit)
+        return principals
+    except PrincipalCRUDError as e:
+        logger.error(f"Error fetching all principals: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch principals"
+        )
+
 @router.post("/principals/", response_model=Principal, status_code=status.HTTP_201_CREATED)
 def create_principal(
         principal: PrincipalCreate,

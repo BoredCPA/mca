@@ -125,22 +125,22 @@ class PrincipalBase(BaseModel):
             return formatted_ssn
         return v
 
-    @field_validator('date_of_birth')
-    @classmethod
-    def validate_date_of_birth(cls, v: Optional[date]) -> Optional[date]:
-        if v:
-            # Must be at least 18 years old
-            today = date.today()
-            age = today.year - v.year - ((today.month, today.day) < (v.month, v.day))
-            if age < 18:
-                raise ValueError('Principal must be at least 18 years old')
-            # Can't be born in the future
-            if v > today:
-                raise ValueError('Date of birth cannot be in the future')
-            # Reasonable age limit (e.g., 120 years)
-            if age > 120:
-                raise ValueError('Invalid date of birth: unrealistic age')
-        return v
+    # @field_validator('date_of_birth')
+    # @classmethod
+    # def validate_date_of_birth(cls, v: Optional[date]) -> Optional[date]:
+    #     if v:
+    #         # Must be at least 18 years old
+    #         today = date.today()
+    #         age = today.year - v.year - ((today.month, today.day) < (v.month, v.day))
+    #         if age < 18:
+    #             raise ValueError('Principal must be at least 18 years old')
+    #         # Can't be born in the future
+    #         if v > today:
+    #             raise ValueError('Date of birth cannot be in the future')
+    #         # Reasonable age limit (e.g., 120 years)
+    #         if age > 120:
+    #             raise ValueError('Invalid date of birth: unrealistic age')
+    #     return v
 
     @field_validator('state')
     @classmethod
@@ -180,7 +180,7 @@ class PrincipalBase(BaseModel):
     @field_validator('phone')
     @classmethod
     def validate_phone(cls, v: Optional[str]) -> Optional[str]:
-        if v:
+        if v is not None:
             # Remove all non-numeric characters
             cleaned = re.sub(r'[^0-9]', '', v)
 
@@ -278,7 +278,7 @@ class PrincipalUpdate(BaseModel):
     # Apply the same validators as PrincipalBase
     _validate_name = field_validator('first_name', 'last_name')(PrincipalBase.validate_name)
     _validate_ssn = field_validator('ssn')(PrincipalBase.validate_ssn)
-    _validate_date_of_birth = field_validator('date_of_birth')(PrincipalBase.validate_date_of_birth)
+    # _validate_date_of_birth = field_validator('date_of_birth')(PrincipalBase.validate_date_of_birth)
     _validate_state = field_validator('state')(PrincipalBase.validate_state)
     _validate_zip = field_validator('zip')(PrincipalBase.validate_zip)
     _validate_phone = field_validator('phone')(PrincipalBase.validate_phone)

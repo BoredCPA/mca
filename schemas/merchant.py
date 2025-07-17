@@ -1,4 +1,4 @@
-# app/schemas/merchant.py - Optimized for backend validation only
+# app/schemas/merchant.py - Fixed phone field validation
 from pydantic import BaseModel, EmailStr, validator, Field, field_validator
 from typing import Optional, List
 from datetime import date, datetime
@@ -83,8 +83,8 @@ class MerchantBase(BaseModel):
 
     @field_validator('state')
     def validate_state(cls, v):
-        if v is None:
-            return v
+        if v is None or v == "":
+            return None
         # Normalize and validate state code (business rule)
         v = v.upper().strip()
         valid_states = [
@@ -101,8 +101,8 @@ class MerchantBase(BaseModel):
 
     @field_validator('zip')
     def validate_zip(cls, v):
-        if v is None:
-            return v
+        if v is None or v == "":
+            return None
         # Basic sanitization - store clean digits only
         cleaned = re.sub(r'[\s-]', '', v.strip())
         # Basic validation - ensure it's numeric
@@ -115,8 +115,8 @@ class MerchantBase(BaseModel):
 
     @field_validator('fein')
     def validate_fein(cls, v):
-        if v is None:
-            return v
+        if v is None or v == "":
+            return None
         # Clean and validate FEIN (business rule)
         cleaned = re.sub(r'[\s-]', '', v.strip())
         if not re.match(r'^\d{9}$', cleaned):
@@ -125,10 +125,14 @@ class MerchantBase(BaseModel):
 
     @field_validator('phone')
     def validate_phone(cls, v):
-        if v is None:
-            return v
+        # Handle empty string from frontend - convert to None
+        if v is None or v == "" or not v.strip():
+            return None
         # Clean phone number - store digits only
         digits = re.sub(r'\D', '', v)
+        # If no digits after cleaning, return None
+        if not digits:
+            return None
         # Validate length (business rule)
         if len(digits) == 11 and digits[0] == '1':
             digits = digits[1:]  # Remove country code
@@ -138,8 +142,8 @@ class MerchantBase(BaseModel):
 
     @field_validator('entity_type')
     def validate_entity_type(cls, v):
-        if v is None:
-            return v
+        if v is None or v == "":
+            return None
         # Business rule validation
         valid_types = [
             'LLC', 'Corporation', 'S-Corp', 'C-Corp',
@@ -152,7 +156,7 @@ class MerchantBase(BaseModel):
 
     @field_validator('status')
     def validate_status(cls, v):
-        if v is None:
+        if v is None or v == "":
             return 'lead'
         # Workflow integrity validation (critical business rule)
         valid_statuses = [
@@ -194,8 +198,8 @@ class MerchantBase(BaseModel):
 
     @field_validator('contact_person')
     def validate_contact_person(cls, v):
-        if v is None:
-            return v
+        if v is None or v == "":
+            return None
         # Basic data cleaning
         v = ' '.join(v.split())
         # Minimum business requirement
@@ -205,13 +209,27 @@ class MerchantBase(BaseModel):
 
     @field_validator('city')
     def validate_city(cls, v):
-        if v is None:
-            return v
+        if v is None or v == "":
+            return None
         # Basic data cleaning
         v = ' '.join(v.split())
         # Minimum business requirement
         if len(v) < 2:
             raise ValueError('City name must be at least 2 characters')
+        return v
+
+    @field_validator('address')
+    def validate_address(cls, v):
+        if v is None or v == "":
+            return None
+        # Basic data cleaning
+        v = ' '.join(v.split())
+        return v if v else None
+
+    @field_validator('notes')
+    def validate_notes(cls, v):
+        if v is None or v == "":
+            return None
         return v
 
 
@@ -239,7 +257,7 @@ class MerchantUpdate(BaseModel):
     status: Optional[str] = None
     notes: Optional[str] = Field(None, max_length=5000)
 
-    # Copy validators from MerchantBase
+    # Copy validators from MerchantBase - using the old validator syntax for compatibility
     _validate_company_name = validator('company_name', allow_reuse=True)(
         MerchantBase.validate_company_name
     )
@@ -272,6 +290,12 @@ class MerchantUpdate(BaseModel):
     )
     _validate_city = validator('city', allow_reuse=True)(
         MerchantBase.validate_city
+    )
+    _validate_address = validator('address', allow_reuse=True)(
+        MerchantBase.validate_address
+    )
+    _validate_notes = validator('notes', allow_reuse=True)(
+        MerchantBase.validate_notes
     )
 
 

@@ -21,12 +21,14 @@ class Offer(Base):
     transfer_balance = Column(Numeric(12, 2), default=0.00)
     deal_id = Column(String, unique=True, nullable=True)
 
+    # Payment calculation fields - bidirectional
+    payment_amount = Column(Numeric(12, 2), nullable=True)
+    number_of_periods = Column(Integer, nullable=True)
+
     # Calculated fields
     rtr = Column(Numeric(12, 2))  # advance * factor
     net_funds = Column(Numeric(12, 2))  # advance - upfront_fees
-    payment_amount = Column(Numeric(12, 2))
     apr = Column(Numeric(5, 2))
-    number_of_periods = Column(Integer, nullable=True)  # Add this field
 
     # Status tracking
     status = Column(String, default="draft")  # draft, sent, selected, funded
